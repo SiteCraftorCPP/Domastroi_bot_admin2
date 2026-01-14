@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+__MACOSX/
+
+# Logs
+*.log
+log_info.txt
+
+# Database
+*.db
+*.sqlite
+
+# User data
+user_bots/
+data_questions/
+*.docx
+
+# Temporary files
+*.tmp
+*.bak
+*.cache
+
+# System files
+desktop.ini
