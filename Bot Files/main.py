@@ -13,11 +13,13 @@ from aiogram.utils.exceptions import Unauthorized, BotKicked
 from aiogram.utils import executor
 from dotenv import load_dotenv
 from datetime import datetime, timedelta
+from telegram_proxy import normalize_telegram_proxy
 from aiogram.utils.exceptions import TelegramAPIError
 from functools import wraps
 import asyncpg
 import subprocess
 import signal
+import shlex
 
 # Функция /start 
 #
@@ -58,6 +60,7 @@ logging.basicConfig(
 )
 
 API_TOKEN = os.getenv('BOT_API_TOKEN')
+TELEGRAM_PROXY = normalize_telegram_proxy(os.getenv('TELEGRAM_PROXY'))
 PAY_TOKEN = os.getenv('PAY_TOKEN')
 GROUP_ID = os.getenv('GROUP_ID')
 CHANNEL_ID = os.getenv('CHANNEL_ID')
@@ -72,8 +75,8 @@ DB_PORT = os.getenv('DB_PORT', '5432')
 if not API_TOKEN or not PAY_TOKEN or not DB_USER or not DB_PASSWORD or not DB_NAME or not DB_HOST:
     raise ValueError("Не все переменные окружения загружены корректно")
 
-# Создание экземпляра бота и диспетчера
-bot = Bot(token=API_TOKEN)
+# Создание экземпляра бота и диспетчера (TELEGRAM_PROXY — локальное тестирование через SOCKS/HTTP)
+bot = Bot(token=API_TOKEN, proxy=TELEGRAM_PROXY)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
@@ -1601,7 +1604,7 @@ async def show_user_bot_info(callback_query: types.CallbackQuery):
         bot_api = user_info['bot_api']
         if bot_api:
             # Создаём временного бота для получения информации о нём
-            temp_bot = Bot(token=bot_api)
+            temp_bot = Bot(token=bot_api, proxy=TELEGRAM_PROXY)
             bot_info = await temp_bot.get_me()  # Получаем информацию о боте
             bot_username = bot_info.username
         else:
@@ -1690,7 +1693,7 @@ def subscription_required(handler):
 
 async def test_api_key(api_key):
     try:
-        test_bot = Bot(token=api_key)
+        test_bot = Bot(token=api_key, proxy=TELEGRAM_PROXY)
         session = await test_bot.get_session()
         bot_info = await test_bot.get_me()
     except Unauthorized:
@@ -1722,15 +1725,20 @@ async def start_user_bot(message: types.Message):
         
         # Копирование исходного файла в папку пользователя
         shutil.copy(SOURCE_SCRIPT, os.path.join(user_bot_dir, 'main.py'))
-        
+        _proxy_helper = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'telegram_proxy.py')
+        if os.path.isfile(_proxy_helper):
+            shutil.copy(_proxy_helper, os.path.join(user_bot_dir, 'telegram_proxy.py'))
+
         script_path = os.path.join(user_bot_dir, 'start_user_bot.sh')
-        
+        _tp_raw = (os.getenv('TELEGRAM_PROXY') or '').strip()
+        _script_lines = ['#!/bin/bash']
+        if _tp_raw:
+            _script_lines.append(f'export TELEGRAM_PROXY={shlex.quote(_tp_raw)}')
+        _script_lines.append(f'export API_KEY={shlex.quote(user_api_key)}')
+        _script_lines.append('source /root/domastroi/venv/bin/activate')
+        _script_lines.append(f'python {os.path.join(user_bot_dir, "main.py")}')
         with open(script_path, 'w') as file:
-            file.write(f'''#!/bin/bash
-            export API_KEY={user_api_key}
-            source /root/domastroi/venv/bin/activate
-            python {os.path.join(user_bot_dir, 'main.py')}
-            ''')
+            file.write('\n'.join(_script_lines) + '\n')
         
         os.chmod(script_path, 0o755)
         

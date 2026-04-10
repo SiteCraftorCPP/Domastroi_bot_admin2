@@ -10,6 +10,7 @@ from aiogram.utils.exceptions import MessageNotModified
 from aiogram.dispatcher.filters import Text
 from aiogram.utils.executor import start_polling
 from dotenv import load_dotenv
+from telegram_proxy import normalize_telegram_proxy
 from docx import Document
 from docx.shared import Pt
 from docx.shared import Inches
@@ -20,6 +21,7 @@ import json
 
 # Загрузка переменных окружения
 load_dotenv()
+TELEGRAM_PROXY = normalize_telegram_proxy(os.getenv('TELEGRAM_PROXY'))
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -138,7 +140,7 @@ async def main():
 
     # Создание экземпляра бота и диспетчера
     global bot
-    bot = Bot(token=API_TOKEN)
+    bot = Bot(token=API_TOKEN, proxy=TELEGRAM_PROXY)
     storage = MemoryStorage()
     dp = Dispatcher(bot, storage=storage)
 
